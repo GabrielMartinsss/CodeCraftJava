@@ -1,5 +1,7 @@
 package com.gabriel.events.service;
 
+import com.gabriel.events.dto.SubscriptionRanking;
+import com.gabriel.events.dto.SubscriptionRankingByUser;
 import com.gabriel.events.dto.SubscriptionResponse;
 import com.gabriel.events.exception.EventNotFoundException;
 import com.gabriel.events.exception.SubscriptionConflictException;
@@ -12,6 +14,9 @@ import com.gabriel.events.repository.SubscriptionRepository;
 import com.gabriel.events.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.IntStream;
 
 @Service
 public class SubscriptionService {
@@ -61,5 +66,30 @@ public class SubscriptionService {
                 + "/" + savedSubscription.getSubscriptionNumber();
 
         return new SubscriptionResponse(savedSubscription.getSubscriptionNumber(), baseURLResponse);
+    }
+
+    public List<SubscriptionRanking> getCompleteRanking(String eventPrettyName) {
+        Event event = eventRepository.findByPrettyName(eventPrettyName);
+        if (event == null) {
+            throw new EventNotFoundException("Event "+ eventPrettyName + " not found.");
+        }
+        return subscriptionRepository.generateRanking(event.getEventId());
+    }
+
+    public SubscriptionRankingByUser getRankingByUser(String prettyName, Integer userId) {
+        List<SubscriptionRanking> ranking = getCompleteRanking(prettyName);
+        SubscriptionRanking userFound = ranking
+                .stream()
+                .filter(item -> item.userId().equals(userId))
+                .findFirst().orElse(null);
+        if (userFound == null) {
+            throw new UserIndicatorNotFoundException("The user doesn't indicate anybody.");
+        }
+
+        int position = IntStream.range(0, ranking.size())
+                .filter(p -> ranking.get(p).userId().equals(userId))
+                .findFirst().getAsInt();
+
+        return new SubscriptionRankingByUser(userFound, position + 1);
     }
 }
